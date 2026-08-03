@@ -77,5 +77,6 @@ yarn-error.log
 # Env / secrets
 .env
 .env.local
+.env.example
 backend/.env
 backend/dist/
