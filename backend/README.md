@@ -6,8 +6,6 @@ Thin Express API for Phase 2 RAG.
 
 ```bash
 cd backend
-cp .env.example .env
-# Optionally add OPENAI_API_KEY to .env
 npm run dev
 ```
 
