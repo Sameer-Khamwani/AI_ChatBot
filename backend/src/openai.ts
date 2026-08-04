@@ -1,7 +1,9 @@
 import OpenAI from 'openai';
 import { Chunk } from './store.js';
-import { cosineSimilarity, keywordScore } from './rag.js';
 import { SourceChip, toSourceChips } from './types.js';
+import { buildMessages } from './llm/prompt.js';
+import { buildMockAnswer, streamMockAnswer } from './llm/mock.js';
+import { rankByEmbedding, rankByKeyword } from './llm/retrieval.js';
 
 let client: OpenAI | null = null;
 
@@ -78,17 +80,7 @@ export const retrieveTopChunks = async (
     try {
       const [queryEmbedding] = await embedTexts([question]);
       if (queryEmbedding.length) {
-        const ranked = [...docChunks]
-          .map(chunk => ({
-            chunk,
-            score: cosineSimilarity(queryEmbedding, chunk.embedding || []),
-          }))
-          .sort((a, b) => b.score - a.score)
-          .slice(0, topK);
-        return {
-          chunks: ranked.map(x => x.chunk),
-          scores: ranked.map(x => x.score),
-        };
+        return rankByEmbedding(queryEmbedding, docChunks, topK);
       }
     } catch (error) {
       if (!isQuotaOrRateLimitError(error)) {
@@ -98,59 +90,7 @@ export const retrieveTopChunks = async (
     }
   }
 
-  const ranked = [...docChunks]
-    .map(chunk => ({
-      chunk,
-      score: keywordScore(question, chunk.text),
-    }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, topK);
-
-  return {
-    chunks: ranked.map(x => x.chunk),
-    scores: ranked.map(x => x.score),
-  };
-};
-
-const buildMessages = (
-  question: string,
-  title: string,
-  contextChunks: Chunk[],
-) => {
-  const context = contextChunks.map(c => c.text).join('\n\n---\n\n');
-  return [
-    {
-      role: 'system' as const,
-      content:
-        'You are a helpful document Q&A assistant. Answer ONLY using the provided context. If the answer is not in the context, say you cannot find it in the document. Be concise.',
-    },
-    {
-      role: 'user' as const,
-      content: `Document title: ${title}\n\nContext:\n${context}\n\nQuestion: ${question}`,
-    },
-  ];
-};
-
-export const buildMockAnswer = (title: string, contextChunks: Chunk[]): string => {
-  const snippet = contextChunks[0]?.text?.slice(0, 280) || 'No context found.';
-  return `Based on "${title}" (local mock RAG): ${snippet}${
-    snippet.endsWith('.') ? '' : '...'
-  }`;
-};
-
-const streamMockAnswer = async function* (
-  title: string,
-  contextChunks: Chunk[],
-): AsyncGenerator<{ type: 'token'; token: string } | { type: 'done' }> {
-  const answer = buildMockAnswer(title, contextChunks);
-  const words = answer.split(/(\s+)/);
-  for (const word of words) {
-    if (word) {
-      yield { type: 'token', token: word };
-      await new Promise(r => setTimeout(r, 12));
-    }
-  }
-  yield { type: 'done' };
+  return rankByKeyword(question, docChunks, topK);
 };
 
 export const generateAnswer = async (
