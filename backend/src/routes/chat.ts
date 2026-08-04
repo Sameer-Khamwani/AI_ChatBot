@@ -5,9 +5,9 @@ import {
   generateAnswerStream,
   retrieveTopChunks,
   embedTexts,
-  friendlyOpenAIError,
-  isQuotaOrRateLimitError,
-} from '../openai.js';
+  friendlyLLMError,
+  isRetryableProviderError,
+} from '../llm/index.js';
 import { chunkText } from '../rag.js';
 import { Chunk, chunks, documents, StoredDocument } from '../store.js';
 
@@ -100,8 +100,8 @@ chatRouter.post('/', async (req, res) => {
     });
   } catch (error: any) {
     console.error(error);
-    return res.status(isQuotaOrRateLimitError(error) ? 429 : 500).json({
-      message: friendlyOpenAIError(error),
+    return res.status(isRetryableProviderError(error) ? 429 : 500).json({
+      message: friendlyLLMError(error),
     });
   }
 });
@@ -157,12 +157,12 @@ chatRouter.post('/stream', async (req, res) => {
   } catch (error: any) {
     console.error(error);
     if (!res.headersSent) {
-      return res.status(isQuotaOrRateLimitError(error) ? 429 : 500).json({
-        message: friendlyOpenAIError(error),
+      return res.status(isRetryableProviderError(error) ? 429 : 500).json({
+        message: friendlyLLMError(error),
       });
     }
     writeSse(res, 'error', {
-      message: friendlyOpenAIError(error),
+      message: friendlyLLMError(error),
     });
     res.end();
   }
