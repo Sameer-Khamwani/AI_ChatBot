@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 import multer from 'multer';
 import { PDFParse } from 'pdf-parse';
 import { chunkText } from '../rag.js';
-import { embedTexts } from '../openai.js';
+import { embedTexts } from '../llm/index.js';
 import { Chunk, documents, chunks, StoredDocument } from '../store.js';
 
 export const documentsRouter = Router();
